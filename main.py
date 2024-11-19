@@ -459,7 +459,7 @@ class TrafficCam():
                                 # plate_info: string chứa thông tin plate
                                 # conf: độ tin cậy của ocr
                                 plate_info, conf = self.extract_plate(vehicle["plate_image"])
-                                
+
                                 # cập nhật thông tin biển số và độ tin cậy OCR nếu giá trị mới tốt hơn giá trị hiện tại
                                 cur_ocr_conf = vehicle["ocr_conf"]
                                 if conf > cur_ocr_conf:
