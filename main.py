@@ -133,6 +133,7 @@ class TrafficCam():
 
     def extract_plate(self, plate_image):
         results = self.plate_reader.detect_and_ocr(plate_image)
+        print(results)
         # kiểm tra kết quả rec, nếu có ít nhất 1 thì xử lý, không thì trả về chuỗi rỗng, độ tin cậy conf = 0
         if len(results) > 0:
             plate_info = ''
