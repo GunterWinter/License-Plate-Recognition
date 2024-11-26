@@ -8,6 +8,8 @@ import numpy as np
 import torch
 import re
 # from time import time
+import easyocr
+from pygments.lexers.sql import language_re
 
 from ultralytics import YOLO
 from tracking.deep_sort import DeepSort
@@ -111,11 +113,7 @@ class TrafficCam():
         self.plate_detector = YOLO(opts.plate_weight, task='detect').to(device=device)
         self.read_plate = opts.read_plate
         if self.read_plate:
-            self.plate_reader = DetAndRecONNXPipeline(
-                text_det_onnx_model="weights/ppocrv4/ch_PP-OCRv4_det_infer.onnx",
-                text_rec_onnx_model="weights/ppocrv4/ch_PP-OCRv4_rec_infer.onnx",
-                box_thresh=0.4
-            )
+            self.plate_reader = easyocr.Reader(['en', 'vi'])
         self.ocr_thres = opts.ocr_thres
 
         # DeepSort Tracking
@@ -132,18 +130,18 @@ class TrafficCam():
         self.save = opts.save
 
     def extract_plate(self, plate_image):
-        results = self.plate_reader.detect_and_ocr(plate_image)
-        print(results)
-        # kiểm tra kết quả rec, nếu có ít nhất 1 thì xử lý, không thì trả về chuỗi rỗng, độ tin cậy conf = 0
+        results = self.plate_reader.readtext(plate_image, detail=1)  # detail=1 để lấy confidence score
+
         if len(results) > 0:
             plate_info = ''
             conf = []
-            # duyệt qua từng kết quả rec, sau đó ghép các kết quả lại với nhau, sau đó tính độ tin cậy trung bình conf
+            # Duyệt qua từng kết quả OCR
             for result in results:
-                plate_info += result.text + ' '
-                conf.append(result.score)
-            conf = sum(conf) / len(conf)
-            # biểu thức chính quy để loại bỏ ký tự không mong muốn, chỉ giữ lại các ký tự chữ cái, số, -, .
+                text, confidence = result[1], result[2]  # text và độ tin cậy
+                plate_info += text + ' '
+                conf.append(confidence)
+            conf = sum(conf) / len(conf)  # Tính độ tin cậy trung bình
+            # Biểu thức chính quy để loại bỏ ký tự không mong muốn
             return re.sub(r'[^A-Za-z0-9\-.]', '', plate_info), conf
         else:
             return '', 0
@@ -321,7 +319,7 @@ class TrafficCam():
                             vehicle["plate_number"] = ""
                         # Lấy tọa độ bbox của vehicle đang xử lý
                         box = vehicle["bbox_xyxy"].astype(int)
-                        # Lấy plate number của nó
+                        # Lấy plate number của nó từ frame trước
                         plate_number = self.vehicles_dict[str(identity)]["plate_number"]
                         # kiểm tra ocr confidence, độ dài biển số, tính legit của biển số
                         # Tính legit: 
@@ -343,7 +341,6 @@ class TrafficCam():
                                 pos=pos,
                                 text_color=self.color["blue"],
                                 text_color_bg=self.color["green"])
-
                             # Nếu bật lưu, và xe chưa được lưu
                             if self.save and not vehicle["save"]:
                                 # Cắt ảnh vehicle
